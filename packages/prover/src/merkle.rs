@@ -16,25 +16,25 @@ pub struct MerkleTree {
 }
 
 impl MerkleTree {
-pub fn new(depth: usize) -> Self {
-    let empty = Fr::ZERO;
-    let mut levels = Vec::with_capacity(depth);
+    pub fn new(depth: usize) -> Self {
+        let empty = Fr::ZERO;
+        let mut levels = Vec::with_capacity(depth);
 
-    levels.push(Vec::new());
+        levels.push(Vec::new());
 
-    let mut current = empty;
-    for _ in 1..depth {
-        let level = vec![current];
-        levels.push(level);
-        current = poseidon_hash(current, current);
+        let mut current = empty;
+        for _ in 1..depth {
+            let level = vec![current];
+            levels.push(level);
+            current = poseidon_hash(current, current);
+        }
+
+        MerkleTree {
+            levels,
+            depth,
+            root: current,
+        }
     }
-
-    MerkleTree {
-        levels,
-        depth,
-        root: current,
-    }
-}
 
     pub fn insert(&mut self, leaf: Fr) -> (Fr, Vec<Fr>, Vec<bool>) {
         let mut idx = self.levels[0].len();
@@ -193,6 +193,11 @@ mod tests {
         let mut tree = MerkleTree::new(4);
         tree.insert(Fr::from(42u64));
         let (path, indices) = generate_merkle_proof(&tree, 0, Fr::from(42u64)).unwrap();
-        assert!(!MerkleTree::verify(tree.root, Fr::from(99u64), &path, &indices));
+        assert!(!MerkleTree::verify(
+            tree.root,
+            Fr::from(99u64),
+            &path,
+            &indices
+        ));
     }
 }

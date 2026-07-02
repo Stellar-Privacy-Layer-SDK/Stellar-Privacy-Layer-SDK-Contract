@@ -37,7 +37,7 @@ function deriveEncryptionKey(material: string | Uint8Array): Buffer {
   const ikm = typeof material === 'string' ? Buffer.from(material, 'utf-8') : Buffer.from(material);
   const salt = Buffer.from('Stellar-Privacy-Disclosure-v1', 'utf-8');
   const info = Buffer.from('selective-disclosure', 'utf-8');
-  return crypto.hkdfSync('sha256', ikm, salt, info, 32);
+  return Buffer.from(crypto.hkdfSync('sha256', ikm, salt, info, 32));
 }
 
 export class SelectiveDisclosureModule {

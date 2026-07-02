@@ -6,5 +6,5 @@ pub mod types;
 
 pub use circuit::{compute_commitment, compute_nullifier};
 pub use merkle::MerkleTree;
-pub use prover::{Prover, generate_proof, verify_proof};
+pub use prover::{generate_proof, verify_proof, Prover};
 pub use types::ShieldedTransferProof;

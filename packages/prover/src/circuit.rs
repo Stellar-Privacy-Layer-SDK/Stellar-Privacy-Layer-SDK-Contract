@@ -16,11 +16,7 @@ pub fn compute_nullifier(secret: Fr, commitment: Fr) -> Fr {
 }
 
 pub fn generate_witness(inputs: &ProofInputs) -> Option<Witness> {
-    let computed_commitment = compute_commitment(
-        inputs.secret,
-        inputs.recipient,
-        inputs.amount,
-    );
+    let computed_commitment = compute_commitment(inputs.secret, inputs.recipient, inputs.amount);
 
     let computed_nullifier = compute_nullifier(inputs.secret, computed_commitment);
 

@@ -3,8 +3,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 fn bench_merkle_insert(c: &mut Criterion) {
     c.bench_function("merkle_insert_32_depth", |b| {
         b.iter(|| {
-            let mut tree =
-                stellar_privacy_prover::MerkleTree::new(32);
+            let mut tree = stellar_privacy_prover::MerkleTree::new(32);
             let leaf = ark_bn254::Fr::from(42u64);
             tree.insert(black_box(leaf));
         })

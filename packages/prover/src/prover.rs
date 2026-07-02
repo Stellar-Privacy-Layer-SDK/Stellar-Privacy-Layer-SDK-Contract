@@ -1,6 +1,6 @@
 use ark_bn254::Fr;
 use ark_ff::{AdditiveGroup, PrimeField};
-use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use serde::{Deserialize, Serialize};
 
 use crate::circuit::{compute_commitment, compute_nullifier};
@@ -35,24 +35,12 @@ pub fn generate_proof(
     let (root, _path, _indices) = tree.insert(commitment);
 
     ShieldedTransferProof {
-        proof_a: [
-            format_hex(&secret),
-            format_hex(&commitment),
-        ],
+        proof_a: [format_hex(&secret), format_hex(&commitment)],
         proof_b: [
-            [
-                format_hex(&root),
-                format_hex(&nullifier),
-            ],
-            [
-                format_hex(&recipient),
-                format_hex(&amount),
-            ],
+            [format_hex(&root), format_hex(&nullifier)],
+            [format_hex(&recipient), format_hex(&amount)],
         ],
-        proof_c: [
-            format_hex(&Fr::from(_leaf_index)),
-            format_hex(&Fr::ZERO),
-        ],
+        proof_c: [format_hex(&Fr::from(_leaf_index)), format_hex(&Fr::ZERO)],
         root: format_hex(&root),
         nullifier: format_hex(&nullifier),
         recipient: format_hex(&recipient),
@@ -94,7 +82,9 @@ pub fn verify_proof(proof: &ShieldedTransferProof) -> bool {
 
 pub fn format_hex(field: &Fr) -> String {
     let mut bytes = Vec::new();
-    field.serialize_compressed(&mut bytes).expect("failed to serialize field");
+    field
+        .serialize_compressed(&mut bytes)
+        .expect("failed to serialize field");
     hex::encode(bytes)
 }
 
@@ -130,11 +120,8 @@ impl Prover {
     ) -> Option<ShieldedTransferProof> {
         let commitment = compute_commitment(secret, recipient, amount);
 
-        let (path, indices) = crate::merkle::generate_merkle_proof(
-            &self.tree,
-            leaf_index,
-            commitment,
-        )?;
+        let (path, indices) =
+            crate::merkle::generate_merkle_proof(&self.tree, leaf_index, commitment)?;
 
         Some(generate_proof(
             secret, recipient, amount, path, indices, leaf_index,

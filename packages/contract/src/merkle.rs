@@ -1,4 +1,4 @@
-use soroban_sdk::{Env, BytesN, Vec, Bytes};
+use soroban_sdk::{Bytes, BytesN, Env, Vec};
 
 use crate::types::*;
 
@@ -29,7 +29,9 @@ impl MerkleTree {
         }
 
         let root = if depth > 0 {
-            zero_hashes.get(depth - 1).unwrap_or_else(|| BytesN::from_array(e, &[0u8; 32]))
+            zero_hashes
+                .get(depth - 1)
+                .unwrap_or_else(|| BytesN::from_array(e, &[0u8; 32]))
         } else {
             BytesN::from_array(e, &[0u8; 32])
         };
@@ -51,12 +53,16 @@ impl MerkleTree {
         let mut level = 0u32;
         while level < tree.depth {
             if idx.is_multiple_of(2) {
-                let zero_hash = tree.filled_subtrees.get(level)
+                let zero_hash = tree
+                    .filled_subtrees
+                    .get(level)
                     .unwrap_or_else(|| BytesN::from_array(e, &[0u8; 32]));
                 tree.filled_subtrees.set(level, current.clone());
                 current = sha256_pair(e, &current, &zero_hash);
             } else {
-                let left = tree.filled_subtrees.get(level)
+                let left = tree
+                    .filled_subtrees
+                    .get(level)
                     .unwrap_or_else(|| BytesN::from_array(e, &[0u8; 32]));
                 current = sha256_pair(e, &left, &current);
             }

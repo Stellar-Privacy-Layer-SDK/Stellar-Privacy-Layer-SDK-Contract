@@ -1,17 +1,13 @@
-use soroban_sdk::{Env, Address, BytesN, Vec, token::Client as TokenClient};
+use soroban_sdk::{token::Client as TokenClient, Address, BytesN, Env, Vec};
 
-use crate::types::*;
-use crate::merkle::*;
-use crate::verifier::*;
 use crate::events::*;
+use crate::merkle::*;
+use crate::types::*;
+use crate::verifier::*;
 
 const MAX_DEPOSITS: usize = 65536;
 
-pub fn initialize(
-    e: &Env,
-    admin: &Address,
-    verifier: &Address,
-) {
+pub fn initialize(e: &Env, admin: &Address, verifier: &Address) {
     if e.storage().instance().has(&StorageKey::Admin) {
         panic!("already initialized");
     }
@@ -22,7 +18,9 @@ pub fn initialize(
 
     let depth: u32 = MERKLE_TREE_DEPTH.try_into().expect("depth too large");
     let merkle = MerkleTree::new(e, depth);
-    e.storage().instance().set(&StorageKey::Root(merkle.root.clone()), &true);
+    e.storage()
+        .instance()
+        .set(&StorageKey::Root(merkle.root.clone()), &true);
     e.storage().instance().set(&StorageKey::NextLeaf, &0u64);
     e.storage().instance().set(&StorageKey::MerkleTree, &merkle);
 }
@@ -41,27 +39,37 @@ pub fn deposit(
         panic!("amount must be positive");
     }
 
-    if e.storage().instance().has(&StorageKey::Commitment(commitment.clone())) {
+    if e.storage()
+        .instance()
+        .has(&StorageKey::Commitment(commitment.clone()))
+    {
         panic!("commitment already exists");
     }
 
-    let next_leaf: u64 = e.storage().instance().get(&StorageKey::NextLeaf).unwrap_or(0);
+    let next_leaf: u64 = e
+        .storage()
+        .instance()
+        .get(&StorageKey::NextLeaf)
+        .unwrap_or(0);
     if next_leaf as usize >= MAX_DEPOSITS {
         panic!("pool full");
     }
 
-    let mut merkle: MerkleTree = e.storage()
-        .instance()
-        .get(&StorageKey::MerkleTree)
-        .unwrap();
+    let mut merkle: MerkleTree = e.storage().instance().get(&StorageKey::MerkleTree).unwrap();
 
     let leaf = commitment.clone();
     let new_root = MerkleTree::insert(e, &mut merkle, &leaf);
 
     e.storage().instance().set(&StorageKey::MerkleTree, &merkle);
-    e.storage().instance().set(&StorageKey::NextLeaf, &(next_leaf + 1));
-    e.storage().instance().set(&StorageKey::Commitment(commitment.clone()), &true);
-    e.storage().instance().set(&StorageKey::Root(new_root.clone()), &true);
+    e.storage()
+        .instance()
+        .set(&StorageKey::NextLeaf, &(next_leaf + 1));
+    e.storage()
+        .instance()
+        .set(&StorageKey::Commitment(commitment.clone()), &true);
+    e.storage()
+        .instance()
+        .set(&StorageKey::Root(new_root.clone()), &true);
 
     let token_client = TokenClient::new(e, token);
     token_client.transfer(depositor, &e.current_contract_address(), &amount);
@@ -78,19 +86,21 @@ pub fn deposit(
     event
 }
 
-pub fn withdraw(
-    e: &Env,
-    proof: &Proof,
-    amount: i128,
-    token: &Address,
-) -> WithdrawalEvent {
+pub fn withdraw(e: &Env, proof: &Proof, amount: i128, token: &Address) -> WithdrawalEvent {
     assert_not_paused(e);
 
-    if e.storage().instance().has(&StorageKey::Nullifier(proof.nullifier.clone())) {
+    if e.storage()
+        .instance()
+        .has(&StorageKey::Nullifier(proof.nullifier.clone()))
+    {
         panic!("nullifier already spent");
     }
 
-    if !e.storage().instance().has(&StorageKey::Root(proof.root.clone())) {
+    if !e
+        .storage()
+        .instance()
+        .has(&StorageKey::Root(proof.root.clone()))
+    {
         panic!("unknown root");
     }
 
@@ -98,17 +108,12 @@ pub fn withdraw(
         panic!("invalid proof");
     }
 
-    e.storage().instance().set(
-        &StorageKey::Nullifier(proof.nullifier.clone()),
-        &true,
-    );
+    e.storage()
+        .instance()
+        .set(&StorageKey::Nullifier(proof.nullifier.clone()), &true);
 
     let token_client = TokenClient::new(e, token);
-    token_client.transfer(
-        &e.current_contract_address(),
-        &proof.recipient,
-        &amount,
-    );
+    token_client.transfer(&e.current_contract_address(), &proof.recipient, &amount);
 
     let event = WithdrawalEvent {
         recipient: proof.recipient.clone(),
@@ -122,11 +127,7 @@ pub fn withdraw(
     event
 }
 
-pub fn register_viewing_key(
-    e: &Env,
-    owner: &Address,
-    viewing_key_hash: BytesN<32>,
-) {
+pub fn register_viewing_key(e: &Env, owner: &Address, viewing_key_hash: BytesN<32>) {
     owner.require_auth();
 
     let compliance = ComplianceView {
@@ -140,14 +141,11 @@ pub fn register_viewing_key(
         .set(&StorageKey::Compliance(owner.clone()), &compliance);
 }
 
-pub fn authorize_viewer(
-    e: &Env,
-    owner: &Address,
-    viewer: &Address,
-) {
+pub fn authorize_viewer(e: &Env, owner: &Address, viewer: &Address) {
     owner.require_auth();
 
-    let mut compliance: ComplianceView = e.storage()
+    let mut compliance: ComplianceView = e
+        .storage()
         .instance()
         .get(&StorageKey::Compliance(owner.clone()))
         .unwrap_or(ComplianceView {
@@ -165,7 +163,9 @@ pub fn authorize_viewer(
 }
 
 pub fn pause(e: &Env) {
-    let admin: Address = e.storage().instance()
+    let admin: Address = e
+        .storage()
+        .instance()
         .get(&StorageKey::Admin)
         .expect("contract not initialized");
     admin.require_auth();
@@ -173,7 +173,9 @@ pub fn pause(e: &Env) {
 }
 
 pub fn unpause(e: &Env) {
-    let admin: Address = e.storage().instance()
+    let admin: Address = e
+        .storage()
+        .instance()
         .get(&StorageKey::Admin)
         .expect("contract not initialized");
     admin.require_auth();
@@ -181,7 +183,9 @@ pub fn unpause(e: &Env) {
 }
 
 pub fn set_verifier(e: &Env, new_verifier: &Address) {
-    let admin: Address = e.storage().instance()
+    let admin: Address = e
+        .storage()
+        .instance()
         .get(&StorageKey::Admin)
         .expect("contract not initialized");
     admin.require_auth();
@@ -191,9 +195,7 @@ pub fn set_verifier(e: &Env, new_verifier: &Address) {
 }
 
 pub fn get_root(e: &Env) -> Option<Scalar> {
-    let merkle: MerkleTree = e.storage()
-        .instance()
-        .get(&StorageKey::MerkleTree)?;
+    let merkle: MerkleTree = e.storage().instance().get(&StorageKey::MerkleTree)?;
     Some(merkle.root)
 }
 
@@ -211,7 +213,11 @@ pub fn get_pool_size(e: &Env) -> u64 {
 }
 
 fn assert_not_paused(e: &Env) {
-    if e.storage().instance().get::<_, bool>(&StorageKey::Paused).unwrap_or(false) {
+    if e.storage()
+        .instance()
+        .get::<_, bool>(&StorageKey::Paused)
+        .unwrap_or(false)
+    {
         panic!("contract is paused");
     }
 }
@@ -254,7 +260,13 @@ mod tests {
             ShieldedPool::initialize(e.clone(), admin.clone(), verifier.clone());
         });
 
-        TestContext { e, contract_id, admin, verifier, user }
+        TestContext {
+            e,
+            contract_id,
+            admin,
+            verifier,
+            user,
+        }
     }
 
     fn with_contract<T>(ctx: &TestContext, f: impl FnOnce() -> T) -> T {
@@ -284,8 +296,12 @@ mod tests {
 
         let nullifier = BytesN::from_array(&ctx.e, &[42u8; 32]);
         with_contract(&ctx, || {
-            assert!(!ShieldedPool::is_nullifier_spent(ctx.e.clone(), nullifier.clone()));
-            ctx.e.storage()
+            assert!(!ShieldedPool::is_nullifier_spent(
+                ctx.e.clone(),
+                nullifier.clone()
+            ));
+            ctx.e
+                .storage()
                 .instance()
                 .set(&StorageKey::Nullifier(nullifier.clone()), &true);
             assert!(ShieldedPool::is_nullifier_spent(ctx.e.clone(), nullifier));
@@ -301,7 +317,13 @@ mod tests {
             ShieldedPool::set_verifier(ctx.e.clone(), new_verifier.clone());
         });
 
-        let stored: Address = with_contract(&ctx, || ctx.e.storage().instance().get(&StorageKey::Verifier).unwrap());
+        let stored: Address = with_contract(&ctx, || {
+            ctx.e
+                .storage()
+                .instance()
+                .get(&StorageKey::Verifier)
+                .unwrap()
+        });
         assert_eq!(stored, new_verifier);
     }
 
@@ -346,13 +368,23 @@ mod tests {
             ShieldedPool::pause(ctx.e.clone());
         });
         with_contract(&ctx, || {
-            assert!(ctx.e.storage().instance().get::<_, bool>(&StorageKey::Paused).unwrap_or(false));
+            assert!(ctx
+                .e
+                .storage()
+                .instance()
+                .get::<_, bool>(&StorageKey::Paused)
+                .unwrap_or(false));
         });
         with_contract(&ctx, || {
             ShieldedPool::unpause(ctx.e.clone());
         });
         with_contract(&ctx, || {
-            assert!(!ctx.e.storage().instance().get::<_, bool>(&StorageKey::Paused).unwrap_or(true));
+            assert!(!ctx
+                .e
+                .storage()
+                .instance()
+                .get::<_, bool>(&StorageKey::Paused)
+                .unwrap_or(true));
         });
     }
 
@@ -376,7 +408,8 @@ mod tests {
         });
 
         let stored: ComplianceView = with_contract(&ctx, || {
-            ctx.e.storage()
+            ctx.e
+                .storage()
                 .instance()
                 .get(&StorageKey::Compliance(ctx.user.clone()))
                 .unwrap()
@@ -423,7 +456,8 @@ mod tests {
         let ctx = setup_env();
         let nullifier = BytesN::from_array(&ctx.e, &[10u8; 32]);
         with_contract(&ctx, || {
-            ctx.e.storage()
+            ctx.e
+                .storage()
                 .instance()
                 .set(&StorageKey::Nullifier(nullifier.clone()), &true);
         });

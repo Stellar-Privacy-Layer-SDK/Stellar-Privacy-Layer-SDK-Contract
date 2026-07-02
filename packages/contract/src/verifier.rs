@@ -1,28 +1,36 @@
-use soroban_sdk::{Env, Address, Vec, Bytes};
+use soroban_sdk::{Address, Bytes, Env, Vec};
 
 use crate::types::*;
 
-pub fn verify_shielded_transfer(
-    _e: &Env,
-    proof: &Proof,
-    _public_amount: i128,
-) -> bool {
+pub fn verify_shielded_transfer(_e: &Env, proof: &Proof, _public_amount: i128) -> bool {
     if proof.proof_a.len() < 2 || proof.proof_b.len() < 4 || proof.proof_c.len() < 2 {
         return false;
     }
     let mut all_zero = true;
     for i in 0..2 {
-        if proof.proof_a.get(i).is_none_or(|s| s.to_array() != [0u8; 32]) {
+        if proof
+            .proof_a
+            .get(i)
+            .is_none_or(|s| s.to_array() != [0u8; 32])
+        {
             all_zero = false;
         }
     }
     for i in 0..4 {
-        if proof.proof_b.get(i).is_none_or(|s| s.to_array() != [0u8; 32]) {
+        if proof
+            .proof_b
+            .get(i)
+            .is_none_or(|s| s.to_array() != [0u8; 32])
+        {
             all_zero = false;
         }
     }
     for i in 0..2 {
-        if proof.proof_c.get(i).is_none_or(|s| s.to_array() != [0u8; 32]) {
+        if proof
+            .proof_c
+            .get(i)
+            .is_none_or(|s| s.to_array() != [0u8; 32])
+        {
             all_zero = false;
         }
     }
@@ -103,8 +111,8 @@ pub fn compute_commitment(
 mod tests {
     extern crate std;
     use super::*;
-    use soroban_sdk::BytesN;
     use soroban_sdk::testutils::Address as _;
+    use soroban_sdk::BytesN;
 
     fn make_vec(e: &soroban_sdk::Env, vals: &[[u8; 32]]) -> Vec<Scalar> {
         let mut v = Vec::new(e);

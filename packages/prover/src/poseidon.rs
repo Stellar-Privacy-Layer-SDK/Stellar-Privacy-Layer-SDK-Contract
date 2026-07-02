@@ -100,7 +100,10 @@ mod tests {
         let poseidon = Poseidon::new();
         let inputs1 = vec![Fr::from(42u64), Fr::from(99u64)];
         let inputs2 = vec![Fr::from(42u64), Fr::from(99u64)];
-        assert_eq!(poseidon.hash(inputs1).unwrap(), poseidon.hash(inputs2).unwrap());
+        assert_eq!(
+            poseidon.hash(inputs1).unwrap(),
+            poseidon.hash(inputs2).unwrap()
+        );
     }
 
     #[test]
@@ -114,11 +117,7 @@ mod tests {
     #[test]
     fn test_poseidon_rejects_too_many_inputs() {
         let poseidon = Poseidon::new();
-        let result = poseidon.hash(vec![
-            Fr::from(1u64),
-            Fr::from(2u64),
-            Fr::from(3u64),
-        ]);
+        let result = poseidon.hash(vec![Fr::from(1u64), Fr::from(2u64), Fr::from(3u64)]);
         assert!(result.is_err());
     }
 

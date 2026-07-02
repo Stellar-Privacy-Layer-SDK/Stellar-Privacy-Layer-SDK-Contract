@@ -30,20 +30,11 @@ impl ShieldedPool {
         pool::deposit(&e, &depositor, &token, amount, &commitment)
     }
 
-    pub fn withdraw(
-        e: Env,
-        proof: Proof,
-        amount: i128,
-        token: Address,
-    ) -> WithdrawalEvent {
+    pub fn withdraw(e: Env, proof: Proof, amount: i128, token: Address) -> WithdrawalEvent {
         pool::withdraw(&e, &proof, amount, &token)
     }
 
-    pub fn register_viewing_key(
-        e: Env,
-        owner: Address,
-        viewing_key_hash: BytesN<32>,
-    ) {
+    pub fn register_viewing_key(e: Env, owner: Address, viewing_key_hash: BytesN<32>) {
         pool::register_viewing_key(&e, &owner, viewing_key_hash);
     }
 
