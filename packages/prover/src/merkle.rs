@@ -45,7 +45,7 @@ impl MerkleTree {
 
         let mut current = leaf;
         for level in 0..self.depth {
-            let sibling = if idx % 2 == 0 {
+            let sibling = if idx.is_multiple_of(2) {
                 if idx + 1 < self.levels[level].len() {
                     self.levels[level][idx + 1]
                 } else {
@@ -60,9 +60,9 @@ impl MerkleTree {
             };
 
             path.push(sibling);
-            indices.push(idx % 2 == 1);
+            indices.push(!idx.is_multiple_of(2));
 
-            current = if idx % 2 == 0 {
+            current = if idx.is_multiple_of(2) {
                 poseidon_hash(current, sibling)
             } else {
                 poseidon_hash(sibling, current)
@@ -109,7 +109,7 @@ pub fn generate_merkle_proof(
             return None;
         }
 
-        let sibling = if idx % 2 == 0 {
+        let sibling = if idx.is_multiple_of(2) {
             if idx + 1 < tree.levels[level].len() {
                 tree.levels[level][idx + 1]
             } else {
@@ -124,7 +124,7 @@ pub fn generate_merkle_proof(
         };
 
         path.push(sibling);
-        indices.push(idx % 2 == 1);
+        indices.push(!idx.is_multiple_of(2));
         idx /= 2;
     }
 

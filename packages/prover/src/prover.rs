@@ -76,8 +76,7 @@ pub fn verify_proof(proof: &ShieldedTransferProof) -> bool {
         return false;
     }
 
-    let valid_merkle = MerkleTree::verify(root, commitment, &[], &[]);
-    valid_merkle
+    MerkleTree::verify(root, commitment, &[], &[])
 }
 
 pub fn format_hex(field: &Fr) -> String {

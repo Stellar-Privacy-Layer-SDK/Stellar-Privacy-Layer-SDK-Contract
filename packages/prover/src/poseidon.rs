@@ -15,9 +15,9 @@ fn mds_matrix() -> [[Fr; T]; T] {
 
 fn generate_round_constants() -> [[Fr; T]; NR_FULL + NR_PARTIAL] {
     let mut rcs = [[Fr::ZERO; T]; NR_FULL + NR_PARTIAL];
-    for i in 0..NR_FULL + NR_PARTIAL {
-        for j in 0..T {
-            rcs[i][j] = Fr::from((i * T + j + 1) as u64);
+    for (i, rc_row) in rcs.iter_mut().enumerate() {
+        for (j, rc) in rc_row.iter_mut().enumerate() {
+            *rc = Fr::from((i * T + j + 1) as u64);
         }
     }
     rcs
@@ -26,6 +26,12 @@ fn generate_round_constants() -> [[Fr; T]; NR_FULL + NR_PARTIAL] {
 pub struct Poseidon {
     round_constants: [[Fr; T]; NR_FULL + NR_PARTIAL],
     mds: [[Fr; T]; T],
+}
+
+impl Default for Poseidon {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Poseidon {
@@ -47,14 +53,16 @@ impl Poseidon {
         }
 
         let total_rounds = NR_FULL + NR_PARTIAL;
+        let half_full = NR_FULL / 2;
+        let partial_end = half_full + NR_PARTIAL;
         for r in 0..total_rounds {
-            for i in 0..T {
-                state[i] += self.round_constants[r][i];
+            for (i, s) in state.iter_mut().enumerate() {
+                *s += self.round_constants[r][i];
             }
 
-            if r < NR_FULL / 2 || r >= NR_FULL / 2 + NR_PARTIAL {
-                for i in 0..T {
-                    state[i] = self.sbox(state[i]);
+            if !(half_full..partial_end).contains(&r) {
+                for s in state.iter_mut() {
+                    *s = self.sbox(*s);
                 }
             } else {
                 state[0] = self.sbox(state[0]);
@@ -74,9 +82,9 @@ impl Poseidon {
 
     fn mix(&self, state: [Fr; T]) -> [Fr; T] {
         let mut result = [Fr::ZERO; T];
-        for i in 0..T {
-            for j in 0..T {
-                result[i] += self.mds[i][j] * state[j];
+        for (i, r) in result.iter_mut().enumerate() {
+            for (j, m) in self.mds[i].iter().enumerate() {
+                *r += *m * state[j];
             }
         }
         result
