@@ -1,0 +1,10 @@
+pub mod circuit;
+pub mod merkle;
+pub mod poseidon;
+pub mod prover;
+pub mod types;
+
+pub use circuit::{compute_commitment, compute_nullifier};
+pub use merkle::MerkleTree;
+pub use prover::{Prover, generate_proof, verify_proof};
+pub use types::ShieldedTransferProof;

@@ -1,0 +1,20 @@
+{
+  "name": "stellar-privacy-layer",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/sdk",
+    "packages/selective-disclosure",
+    "packages/dapp"
+  ],
+  "scripts": {
+    "build:sdk": "npm run build -w packages/sdk",
+    "build:dapp": "npm run build -w packages/dapp",
+    "build:all": "npm run build:sdk && npm run build:dapp",
+    "test": "npm run test -w packages/sdk",
+    "lint": "npm run lint -w packages/sdk"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

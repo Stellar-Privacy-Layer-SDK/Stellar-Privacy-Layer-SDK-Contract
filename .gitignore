@@ -1,0 +1,27 @@
+# Rust
+target/
+
+# Node
+node_modules/
+dist/
+build/
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+*.lcov
+
+# Logs
+*.log

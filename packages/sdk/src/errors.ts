@@ -1,0 +1,24 @@
+export enum ErrorCode {
+  CONNECTION_FAILED = 'CONNECTION_FAILED',
+  PROOF_GENERATION_FAILED = 'PROOF_GENERATION_FAILED',
+  PROOF_VERIFICATION_FAILED = 'PROOF_VERIFICATION_FAILED',
+  INVALID_COMMITMENT = 'INVALID_COMMITMENT',
+  NULLIFIER_SPENT = 'NULLIFIER_SPENT',
+  UNAUTHORIZED = 'UNAUTHORIZED',
+  CONTRACT_PAUSED = 'CONTRACT_PAUSED',
+  POOL_FULL = 'POOL_FULL',
+  INVALID_AMOUNT = 'INVALID_AMOUNT',
+  COMPLIANCE_ERROR = 'COMPLIANCE_ERROR',
+  KEY_GENERATION_FAILED = 'KEY_GENERATION_FAILED',
+}
+
+export class PrivacySDKError extends Error {
+  constructor(
+    public code: ErrorCode,
+    message: string,
+    public details?: unknown,
+  ) {
+    super(`[${code}] ${message}`);
+    this.name = 'PrivacySDKError';
+  }
+}

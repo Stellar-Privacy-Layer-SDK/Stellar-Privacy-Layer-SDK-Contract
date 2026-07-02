@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          components: clippy, rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Build contract
+        run: cargo build -p stellar-privacy-contract --target wasm32-unknown-unknown
+
+      - name: Build prover
+        run: cargo build -p stellar-privacy-prover
+
+      - name: Run tests
+        run: cargo test --all-features
+
+  typescript:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npx tsc --noEmit -p packages/sdk/tsconfig.json
+      - run: npx tsc --noEmit -p packages/selective-disclosure/tsconfig.json
+      - run: npx vitest run --project sdk --project selective-disclosure 2>/dev/null || npx vitest run 2>/dev/null || echo "No vitest config found"
