@@ -2,6 +2,7 @@
 #![cfg_attr(test, deny(warnings))]
 
 mod events;
+mod g16;
 mod merkle;
 mod pool;
 mod types;
@@ -34,6 +35,15 @@ impl ShieldedPool {
         pool::withdraw(&e, &proof, amount, &token)
     }
 
+    pub fn withdraw_groth16(
+        e: Env,
+        proof: Groth16Proof,
+        amount: i128,
+        token: Address,
+    ) -> WithdrawalEvent {
+        pool::withdraw_groth16(&e, &proof, amount, &token)
+    }
+
     pub fn register_viewing_key(e: Env, owner: Address, viewing_key_hash: BytesN<32>) {
         pool::register_viewing_key(&e, &owner, viewing_key_hash);
     }
@@ -52,6 +62,14 @@ impl ShieldedPool {
 
     pub fn set_verifier(e: Env, new_verifier: Address) {
         pool::set_verifier(&e, &new_verifier);
+    }
+
+    pub fn set_groth16_vk(e: Env, vk: Groth16Vk) {
+        pool::set_groth16_vk(&e, &vk);
+    }
+
+    pub fn get_groth16_vk(e: Env) -> Option<Groth16Vk> {
+        pool::get_groth16_vk(&e)
     }
 
     pub fn get_root(e: Env) -> Option<BytesN<32>> {
