@@ -7,7 +7,7 @@ license.workspace = true
 [dependencies]
 ark-bls12-381 = "0.5"
 ark-bn254 = "0.5"
-ark-ec = "0.5"
+ark-ec = "0.6"
 ark-ff = "0.5"
 ark-groth16 = "0.5"
 ark-poly = "0.5"
