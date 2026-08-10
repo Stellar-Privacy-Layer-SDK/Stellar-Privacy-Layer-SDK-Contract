@@ -1,0 +1,41 @@
+version: 2
+updates:
+  # npm workspaces — everything is resolved from the root lockfile.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+    versioning-strategy: increase-if-necessary
+    open-pull-requests-limit: 5
+    groups:
+      typescript-tooling:
+        patterns:
+          - 'typescript'
+          - '@types/*'
+          - 'vite'
+          - 'vitest'
+          - '@vitest/*'
+          - '@biomejs/biome'
+          - 'react'
+          - 'react-dom'
+          - '@types/react*'
+
+  # Rust workspace (contract + prover).
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+    open-pull-requests-limit: 5
+
+  # GitHub Actions (keeps SHA-pinned actions fresh).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+    open-pull-requests-limit: 5

@@ -1,0 +1,69 @@
+# cargo-deny configuration — https://embarkstudios.github.io/cargo-deny/
+#
+# Enforced in CI (`.github/workflows/ci.yml` → `security` job) so every
+# push/PR is checked against the RustSec advisory database, the license
+# policy below, and the duplicate-crate policy.
+#
+# Local check (after `cargo install cargo-deny --locked`):
+#   cargo deny check
+
+# -- advisory checks -----------------------------------------------------------
+# Vulnerabilities are always denied by cargo-deny (this is a financial-privacy
+# project — no silent risk). Unmaintained / unsound advisories are scoped to
+# transitive dependencies and surfaced as warnings, then reviewed on
+# Dependabot PRs rather than blocking merges outright.
+[advisories]
+# Documented, tracked exceptions. Remove an entry as soon as an upstream fix
+# is available — Dependabot + `cargo audit` will flag the change.
+ignore = [
+    # RUSTSEC-2025-0055 (ANSI log poisoning in tracing-subscriber): ark-relations
+    # 0.5 (arkworks) pins tracing-subscriber 0.2.x and there is no 0.2-compatible
+    # fixed release upstream (the fix requires >=0.3.20). The prover exposes no
+    # logging API and never logs untrusted input, so this is not exploitable in
+    # this crate's graph. Tracked: remove when arkworks ships an updated
+    # tracing-subscriber dependency.
+    "RUSTSEC-2025-0055",
+    # RUSTSEC-2024-0388: `derivative` is unmaintained. Pinned by ark-ec 0.4/0.5
+    # (both the prover's arkworks and soroban-env-host's BLS12-381 deps); no safe
+    # upgrade exists upstream. Tracked: remove when arkworks/soroban migrate.
+    "RUSTSEC-2024-0388",
+    # RUSTSEC-2024-0436: `paste` is unmaintained. Used by soroban-sdk macros;
+    # no maintained fork is in the graph. Tracked: remove when soroban migrates.
+    "RUSTSEC-2024-0436",
+]
+unmaintained = "transitive"
+unsound = "transitive"
+yanked = "warn"
+
+# -- license checks -------------------------------------------------------------
+[licenses]
+# Explicit allow-list for licenses present in this project's dependency graph.
+# The default policy additionally accepts OSI-/FSF-approved free licenses, so
+# new dependencies stay buildable while non-free or unknown licenses surface
+# for manual review.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception", # wasmparser / wasmparser-nostd (transitive via soroban-env-host)
+    "BSD-3-Clause",
+    "Unicode-3.0",
+]
+# The confidence threshold for detecting a license from license text.
+confidence-threshold = 0.8
+
+# -- duplicate-crate checks -----------------------------------------------------
+[bans]
+# Duplicate major versions are normal in transitive graphs (e.g. syn 2/3);
+# surface them as warnings instead of hard failures and track them via
+# Dependabot. Wildcard version requirements are allowed for 0.x crates.
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+
+# -- crate sources --------------------------------------------------------------
+[sources]
+# Only crates.io — no unvetted git or alternate registry sources.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

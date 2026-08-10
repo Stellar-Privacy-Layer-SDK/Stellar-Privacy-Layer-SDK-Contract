@@ -26,9 +26,16 @@ function deriveKey(material: Uint8Array): Uint8Array {
   return hkdfSha256(material, HKDF_SALT, HKDF_INFO, 32);
 }
 
-export class KeyManager {
+/**
+ * Key management namespace.
+ *
+ * Implemented as a plain object of functions (no class) so it stays trivially
+ * tree-shakeable and linter-clean; the call shape is identical to a static
+ * class (`KeyManager.generateKeyPair()`, …).
+ */
+export const KeyManager = {
   /** Generate a fresh privacy key pair (secret key, public key, viewing key). */
-  static generateKeyPair(): KeyPair {
+  generateKeyPair(): KeyPair {
     try {
       const secretKey = randomBytes(32);
       const key = deriveKey(secretKey);
@@ -42,42 +49,43 @@ export class KeyManager {
         error,
       );
     }
-  }
+  },
 
   /** Generate a fresh 32-byte deposit secret. */
-  static generateSecret(): Uint8Array {
+  generateSecret(): Uint8Array {
     return randomBytes(32);
-  }
+  },
 
   /** Generate a fresh 32-byte regulatory viewing key. */
-  static generateViewingKey(): Uint8Array {
+  generateViewingKey(): Uint8Array {
     return randomBytes(32);
-  }
+  },
 
   /** SHA-256 hash of a viewing key, hex-encoded. */
-  static computeViewingKeyHash(viewingKey: Uint8Array): string {
+  computeViewingKeyHash(viewingKey: Uint8Array): string {
     return bytesToHex(sha256Digest(viewingKey));
-  }
+  },
 
   /** Derive the public key (hex) from a secret key material. */
-  static derivePublicKey(secretKey: Uint8Array): string {
+  derivePublicKey(secretKey: Uint8Array): string {
     return bytesToHex(deriveKey(secretKey));
-  }
+  },
 
   /**
    * Encrypt data for a viewer using their public key material with
    * AES-256-GCM. Output layout: [iv || ciphertext || tag].
    */
-  static encryptForViewer(data: Uint8Array, viewerPublicKey: Uint8Array): Uint8Array {
+  encryptForViewer(data: Uint8Array, viewerPublicKey: Uint8Array): Uint8Array {
     const key = deriveKey(viewerPublicKey);
     return aesGcmEncrypt(key, data);
-  }
+  },
 
   /**
-   * Decrypt data encrypted with {@link encryptForViewer} using the matching
-   * viewing key. Throws {@link PrivacySDKError} on tampered data or a wrong key.
+   * Decrypt data encrypted with {@link KeyManager.encryptForViewer} using the
+   * matching viewing key. Throws {@link PrivacySDKError} on tampered data or a
+   * wrong key.
    */
-  static decryptWithViewingKey(encryptedData: Uint8Array, viewingKey: Uint8Array): Uint8Array {
+  decryptWithViewingKey(encryptedData: Uint8Array, viewingKey: Uint8Array): Uint8Array {
     try {
       const key = deriveKey(viewingKey);
       return aesGcmDecrypt(key, encryptedData);
@@ -88,14 +96,14 @@ export class KeyManager {
         error,
       );
     }
-  }
+  },
 
   /**
    * Compute the shielded deposit commitment: SHA-256(secret || recipient || amount).
    * Note: this is the convenience hash used by the reference SDK. The on-chain
    * contract and Rust prover use Poseidon-based commitments for production use.
    */
-  static hashCommitment(secret: Uint8Array, recipient: string, amount: bigint): string {
+  hashCommitment(secret: Uint8Array, recipient: string, amount: bigint): string {
     const recipientBytes = new TextEncoder().encode(recipient);
     const amountBytes = new TextEncoder().encode(amount.toString());
     const buf = new Uint8Array(secret.length + recipientBytes.length + amountBytes.length);
@@ -103,7 +111,7 @@ export class KeyManager {
     buf.set(recipientBytes, secret.length);
     buf.set(amountBytes, secret.length + recipientBytes.length);
     return bytesToHex(sha256Digest(buf));
-  }
+  },
 
   /**
    * Compute the on-chain nullifier: SHA-256(secret || commitment).
@@ -114,19 +122,19 @@ export class KeyManager {
    * `H(H(secret) || commitment)` so it can be verified without exposing the
    * secret — see `generateWithdrawalProof`.
    */
-  static hashNullifier(secret: Uint8Array, commitment: string): string {
+  hashNullifier(secret: Uint8Array, commitment: string): string {
     const commitmentBytes = hexToBytes(commitment);
     const buf = new Uint8Array(secret.length + commitmentBytes.length);
     buf.set(secret, 0);
     buf.set(commitmentBytes, secret.length);
     return bytesToHex(sha256Digest(buf));
-  }
+  },
 
-  static toHex(bytes: Uint8Array): string {
+  toHex(bytes: Uint8Array): string {
     return bytesToHex(bytes);
-  }
+  },
 
-  static fromHex(hex: string): Uint8Array {
+  fromHex(hex: string): Uint8Array {
     return hexToBytes(hex);
-  }
-}
+  },
+};

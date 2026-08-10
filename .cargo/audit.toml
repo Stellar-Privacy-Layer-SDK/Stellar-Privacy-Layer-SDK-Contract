@@ -1,0 +1,9 @@
+# cargo-audit configuration — mirrors the documented exceptions in deny.toml.
+#
+# RUSTSEC-2025-0055 (tracing-subscriber 0.2 ANSI log poisoning): ark-relations
+# 0.5 (arkworks) pins tracing-subscriber 0.2.x; no 0.2-compatible fixed release
+# exists upstream. The prover exposes no logging API and never logs untrusted
+# input, so this advisory is not exploitable in this crate's graph. Remove this
+# entry when arkworks ships an updated tracing-subscriber dependency.
+[advisories]
+ignore = ["RUSTSEC-2025-0055"]

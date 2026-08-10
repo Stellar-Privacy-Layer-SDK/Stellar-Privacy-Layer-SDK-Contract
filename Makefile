@@ -1,4 +1,4 @@
-.PHONY: all build check test clean build-contract build-prover build-sdk build-dapp typecheck lint format test-coverage docker-build docker-up docker-down deploy deploy-contract fixture
+.PHONY: all build check test clean build-contract build-prover build-sdk build-dapp typecheck lint format test-coverage audit docker-build docker-up docker-down deploy deploy-contract fixture
 
 all: build test
 
@@ -16,6 +16,11 @@ test:
 
 test-coverage:
 	npm run test:coverage
+
+audit:
+	npm audit
+	cargo audit
+	cargo deny check
 
 typecheck:
 	npm run typecheck

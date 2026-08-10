@@ -4,6 +4,8 @@ const RETVALS: Record<string, unknown> = {
   get_root: 'ab'.repeat(32),
   is_nullifier_spent: true,
   get_pool_size: 42,
+  is_paused: false,
+  version: 1,
   get_compliance: {
     owner: 'GA',
     viewing_key_hash: 'ab'.repeat(32),
@@ -212,9 +214,43 @@ describe('ShieldedPoolClient', () => {
     expect(view).toEqual(RETVALS.get_compliance);
   });
 
-  it('aggregates pool stats', async () => {
+  it('reads the paused flag', async () => {
+    const client = new ShieldedPoolClient(VALID_CONFIG);
+    expect(await client.getPaused()).toBe(false);
+  });
+
+  it('returns false when the paused read fails', async () => {
+    mockBuild.mockRejectedValueOnce(new Error('boom'));
+    const client = new ShieldedPoolClient(VALID_CONFIG);
+    expect(await client.getPaused()).toBe(false);
+  });
+
+  it('reads the contract version', async () => {
+    const client = new ShieldedPoolClient(VALID_CONFIG);
+    expect(await client.getVersion()).toBe(1);
+  });
+
+  it('falls back to version 1 when the version read fails', async () => {
+    mockBuild.mockRejectedValueOnce(new Error('boom'));
+    const client = new ShieldedPoolClient(VALID_CONFIG);
+    expect(await client.getVersion()).toBe(1);
+  });
+
+  it('aggregates pool stats from live on-chain reads', async () => {
     const client = new ShieldedPoolClient(VALID_CONFIG);
     const stats = await client.getPoolStats();
     expect(stats).toEqual({ root: 'ab'.repeat(32), size: 42, isPaused: false, version: 1 });
+    expect(mockBuild).toHaveBeenCalledWith(expect.objectContaining({ method: 'get_root' }));
+    expect(mockBuild).toHaveBeenCalledWith(expect.objectContaining({ method: 'get_pool_size' }));
+    expect(mockBuild).toHaveBeenCalledWith(expect.objectContaining({ method: 'is_paused' }));
+    expect(mockBuild).toHaveBeenCalledWith(expect.objectContaining({ method: 'version' }));
+  });
+
+  it('returns a paused pool state when paused on-chain', async () => {
+    RETVALS.is_paused = true;
+    const client = new ShieldedPoolClient(VALID_CONFIG);
+    const stats = await client.getPoolStats();
+    expect(stats.isPaused).toBe(true);
+    RETVALS.is_paused = false;
   });
 });

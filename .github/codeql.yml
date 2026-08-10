@@ -1,0 +1,14 @@
+name: CodeQL configuration
+
+paths:
+  - packages/sdk/src
+  - packages/selective-disclosure/src
+  - packages/dapp/src
+  - scripts
+
+paths-ignore:
+  - '**/*.test.ts'
+  - '**/*.test.tsx'
+  - '**/dist'
+  - '**/node_modules'
+  - '**/coverage'

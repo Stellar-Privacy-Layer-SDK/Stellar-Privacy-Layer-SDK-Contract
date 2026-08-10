@@ -1,5 +1,12 @@
 # Stellar Privacy Layer — Confidential Transfers SDK
 
+![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)
+![Dependabot](https://img.shields.io/badge/dependabot-enabled-025e8c?logo=dependabot)
+
+> CI badge: once the repository is public, add
+> `![CI](https://img.shields.io/github/actions/workflow/status/<owner>/<repo>/ci.yml?branch=main)`
+> at the top of this README.
+
 A production-ready SDK for shielded asset transfers on Stellar, leveraging the network's **native zero-knowledge primitives** (BLS12-381 pairing + Poseidon). It enables developers to build privacy-preserving financial applications with **selective compliance disclosure** — privacy where you want it, transparency where the law requires it ("hug and ripples" compliance-forward architecture).
 
 ## Table of contents
@@ -13,7 +20,7 @@ A production-ready SDK for shielded asset transfers on Stellar, leveraging the n
 - [Scripts](#scripts)
 - [Testing & coverage](#testing--coverage)
 - [Deployment](#deployment)
-- [Security notes](#security-notes)
+- [Security](#security)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -122,19 +129,24 @@ See [`.env.example`](./.env.example) and [`packages/dapp/.env.example`](./packag
 ```bash
 npm run dev                  # start the dApp (vite dev server)
 npm run check                # full gate: lint, format, typecheck, coverage, build
-npm run lint                 # biome check
+npm run lint                 # biome check (warnings fail the build)
 npm run format               # biome format --write
 npm run typecheck            # tsc --noEmit across all TS packages
 npm test                     # vitest (all TS packages)
 npm run test:coverage        # vitest with coverage + threshold gates (>=80%)
 npm run build:all            # build sdk → selective-disclosure → dapp
+npm run audit                # npm audit (production dependency vulnerabilities)
 
 make check                   # Rust + TS full gate
 make test                    # cargo tests + npm tests
+make audit                   # npm audit + cargo audit + cargo deny check
 make build-contract          # contract wasm (release)
 make build-prover            # prover release build
 make docker-up               # docker compose up -d
 ```
+
+A `.nvmrc` pins the Node major version; `nvm use` picks it up automatically.
+
 
 ## Groth16 mode (production ZK path)
 
@@ -174,12 +186,12 @@ the fixture with arkworks, so a stale or mismatched fixture fails CI.
 
 ## Testing & coverage
 
-| Package | Tests | Coverage (statements) |
+| Package | Tests | Coverage (statements / lines) |
 | --- | --- | --- |
-| `@stellar-privacy/sdk` | 108 unit tests | **94.7%** |
-| `@stellar-privacy/selective-disclosure` | 15 unit tests | **97.6%** |
-| `@stellar-privacy/dapp` | 14 component tests | **89.5%** |
-| `stellar-privacy-contract` | 28 contract tests | — |
+| `@stellar-privacy/sdk` | 113 unit tests | **94.9% / 95.4%** |
+| `@stellar-privacy/selective-disclosure` | 15 unit tests | **97.6% / 97.6%** |
+| `@stellar-privacy/dapp` | 14 component tests | **88.9% / 93.3%** |
+| `stellar-privacy-contract` | 30 contract tests | — |
 | `stellar-privacy-prover` | 23 unit tests | — |
 
 Coverage thresholds are enforced by CI (`>=80%` statements/lines/functions).
@@ -190,8 +202,16 @@ Generate a local report with `npm run test:coverage` (also writes `lcov`).
 GitHub Actions runs on every push/PR to `main` (see [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)):
 
 - **Rust job** — `cargo fmt --check`, `cargo clippy -D warnings`, wasm32 contract build, `cargo test --all-features`, cached cargo, wasm artifact upload.
-- **TypeScript job** — `npm ci`, biome lint + format check, typecheck, production build of all packages, tests with coverage gates, dapp artifact upload.
-- **Status job** — aggregates both into one pass/fail signal.
+- **TypeScript job** — `npm ci`, biome lint (**warnings fail the build**) + format check, typecheck, production build of all packages, tests with coverage gates, dapp artifact upload.
+- **Security job** — `npm audit`, `cargo audit` (RustSec), and `cargo deny` (licenses/bans/advisories) gate every change.
+- **Status job** — aggregates all three into one pass/fail signal.
+
+Additional hardening:
+
+- **CodeQL** ([`codeql.yml`](./.github/workflows/codeql.yml)) scans the TypeScript source on every PR and weekly.
+- **Dependabot** ([`dependabot.yml`](./.github/dependabot.yml)) opens weekly PRs for npm, cargo, and GitHub Actions updates.
+- **Supply chain** — every third-party GitHub Action is pinned to the exact commit of a released major tag.
+- **Security policy** — see [`SECURITY.md`](./SECURITY.md) for the responsible-disclosure process.
 
 No step can silently pass: the previous workflow's `|| echo "no config found"` fallbacks have been removed.
 
@@ -211,6 +231,10 @@ docker compose up -d --build
 # Health check
 curl -fsS http://localhost:8080
 ```
+
+The container runs as a **non-root** nginx user (`nginxinc/nginx-unprivileged`)
+listening on port 8080, with a Docker healthcheck and log rotation.
+
 
 ### Option B — manual
 
@@ -232,9 +256,12 @@ cargo install stellar-cli --features cli
 
 Copy the printed contract id into `VITE_CONTRACT_ID` and rebuild the dApp.
 
-## Security notes
+## Security
 
-- **Secrets** — never commit `DEPLOYER_SECRET` or `.env`; the repo's `.gitignore` excludes them.
+- **Secrets** — never commit `DEPLOYER_SECRET` or `.env`; the repo's `.gitignore` excludes them and the deploy script refuses to run without them.
+- **Dependency auditing** — `npm audit`, `cargo audit`, and `cargo deny` run in CI on every push/PR. Current status: **0 npm vulnerabilities, 0 unfixed Rust vulnerabilities**. Three RustSec advisories are documented, tracked exceptions in [`deny.toml`](./deny.toml) — all are unmaintained/transitive-only dependencies of arkworks/soroban with no upstream fix available (`tracing-subscriber 0.2` log-poisoning, `derivative`, `paste`); none are exploitable in this codebase, and each entry explains when to remove it.
+- **Supply chain** — GitHub Actions are pinned to exact commits; CodeQL scans PRs; Dependabot keeps dependencies current.
+- **Vulnerability reporting** — see [`SECURITY.md`](./SECURITY.md).
 - **Cryptography** — the SDK uses audited, dependency-free `@noble` primitives (AES-256-GCM, HKDF-SHA256, SHA-256) that run identically in browsers and Node. The Rust prover implements Poseidon and real Groth16 proofs over BLS12-381 (arkworks).
 - **On-chain Groth16 verification** — `withdraw_groth16` runs the full verification equation on-chain with Stellar's native BLS12-381 host functions: public-input MSM (`g1_msm`) plus a 4-pair pairing product (`pairing_check`). Every point is subgroup-checked and the verifying key is validated at set time. The reference `withdraw` path (structural checks + Merkle root) remains for compatibility and is documented as such.
 - **Input validation** — all public SDK surfaces validate inputs and throw typed `PrivacySDKError`s with stable codes.
@@ -243,10 +270,12 @@ Copy the printed contract id into `VITE_CONTRACT_ID` and rebuild the dApp.
 
 ## Contributing
 
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full guide. In short:
+
 1. Fork and clone the repository.
-2. Run `npm install` and `make check` to verify a clean baseline.
+2. Run `nvm use`, `npm install`, and `make check` to verify a clean baseline.
 3. Add tests for new behavior (coverage gates apply).
-4. Open a pull request — CI runs the full gate automatically.
+4. Open a pull request — CI runs the full gate (including security audits) automatically.
 
 ## License
 

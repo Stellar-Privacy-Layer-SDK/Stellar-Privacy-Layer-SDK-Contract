@@ -299,12 +299,15 @@ pub fn get_pool_size(e: &Env) -> u64 {
         .unwrap_or(0)
 }
 
-fn assert_not_paused(e: &Env) {
-    if e.storage()
+pub fn is_paused(e: &Env) -> bool {
+    e.storage()
         .instance()
         .get::<_, bool>(&StorageKey::Paused)
         .unwrap_or(false)
-    {
+}
+
+fn assert_not_paused(e: &Env) {
+    if is_paused(e) {
         panic!("contract is paused");
     }
 }
@@ -420,6 +423,26 @@ mod tests {
         let ctx = setup_env();
         with_contract(&ctx, || {
             assert_eq!(ShieldedPool::get_pool_size(ctx.e.clone()), 0);
+        });
+    }
+
+    #[test]
+    fn test_is_paused_flag() {
+        let ctx = setup_env();
+        with_contract(&ctx, || {
+            assert!(!ShieldedPool::is_paused(ctx.e.clone()));
+        });
+        with_contract(&ctx, || {
+            ShieldedPool::pause(ctx.e.clone());
+        });
+        with_contract(&ctx, || {
+            assert!(ShieldedPool::is_paused(ctx.e.clone()));
+        });
+        with_contract(&ctx, || {
+            ShieldedPool::unpause(ctx.e.clone());
+        });
+        with_contract(&ctx, || {
+            assert!(!ShieldedPool::is_paused(ctx.e.clone()));
         });
     }
 

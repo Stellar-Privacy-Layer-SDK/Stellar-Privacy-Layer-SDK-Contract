@@ -84,6 +84,10 @@ impl ShieldedPool {
         pool::get_pool_size(&e)
     }
 
+    pub fn is_paused(e: Env) -> bool {
+        pool::is_paused(&e)
+    }
+
     pub fn version() -> u32 {
         1
     }

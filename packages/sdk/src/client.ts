@@ -159,10 +159,41 @@ export class ShieldedPoolClient {
     return this.simulateRead('get_compliance', [new Address(owner).toScVal()]);
   }
 
-  /** Convenience aggregate of read-only pool statistics. */
+  /** Read whether the shielded pool is paused by its admin. */
+  async getPaused(): Promise<boolean> {
+    try {
+      const result = await this.simulateRead('is_paused', []);
+      return result === true;
+    } catch (error) {
+      log.warn('is_paused failed', { error: messageOf(error) });
+      return false;
+    }
+  }
+
+  /** Read the contract version. */
+  async getVersion(): Promise<number> {
+    try {
+      const result = await this.simulateRead('version', []);
+      return Number(result);
+    } catch (error) {
+      log.warn('version read failed', { error: messageOf(error) });
+      return 1;
+    }
+  }
+
+  /**
+   * Convenience aggregate of read-only pool statistics. Each read degrades
+   * gracefully (root → null, size → 0, paused → false, version → 1) so callers
+   * always get a well-formed {@link PoolStats} even when a read fails.
+   */
   async getPoolStats(): Promise<PoolStats> {
-    const [root, size] = await Promise.all([this.getRoot(), this.getPoolSize()]);
-    return { root, size, isPaused: false, version: 1 };
+    const [root, size, isPaused, version] = await Promise.all([
+      this.getRoot(),
+      this.getPoolSize(),
+      this.getPaused(),
+      this.getVersion(),
+    ]);
+    return { root, size, isPaused, version };
   }
 
   /**
