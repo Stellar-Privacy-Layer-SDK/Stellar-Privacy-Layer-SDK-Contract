@@ -1,4 +1,5 @@
 pub mod circuit;
+pub mod groth16;
 pub mod merkle;
 pub mod poseidon;
 pub mod prover;
