@@ -1,17 +1,32 @@
-.PHONY: all build check test clean build-contract build-prover build-sdk build-dapp
+.PHONY: all build check test clean build-contract build-prover build-sdk build-dapp typecheck lint format test-coverage docker-build docker-up docker-down deploy deploy-contract fixture
 
 all: build test
 
 build: build-contract build-prover build-sdk
 
 check:
-	cargo check -p stellar-privacy-contract --target wasm32-unknown-unknown
-	cargo check -p stellar-privacy-prover
-	npm run build:sdk
+	cargo fmt --all --check
+	cargo clippy --all-targets --all-features -- -D warnings
+	npm run check
 
 test:
 	cargo test -p stellar-privacy-prover
+	cargo test -p stellar-privacy-contract
 	npm test
+
+test-coverage:
+	npm run test:coverage
+
+typecheck:
+	npm run typecheck
+
+lint:
+	cargo clippy --all-targets --all-features -- -D warnings
+	npm run lint
+
+format:
+	cargo fmt --all
+	npm run format
 
 build-contract:
 	cargo build -p stellar-privacy-contract --target wasm32-unknown-unknown --release
@@ -25,21 +40,24 @@ build-sdk:
 build-dapp:
 	npm run build:dapp
 
+docker-build:
+	docker compose build
+
+docker-up:
+	docker compose up -d
+
+docker-down:
+	docker compose down
+
+deploy:
+	./scripts/deploy.sh dapp
+
+deploy-contract:
+	./scripts/deploy.sh contract
+
+fixture:
+	cargo run -p stellar-privacy-prover --example gen_groth16_fixture
+
 clean:
 	cargo clean
-	rm -rf packages/sdk/dist packages/selective-disclosure/dist packages/dapp/build
-
-lint:
-	cargo clippy --all-targets -- -D warnings
-	npm run lint
-
-format:
-	cargo fmt --all
-	npm run format
-
-.PHONY: deploy-contract
-deploy-contract:
-	stellar contract deploy \
-		--wasm target/wasm32-unknown-unknown/release/stellar_privacy_contract.wasm \
-		--source \$${DEPLOYER_SECRET} \
-		--network \$${STELLAR_NETWORK}
+	rm -rf packages/sdk/dist packages/selective-disclosure/dist packages/dapp/dist
