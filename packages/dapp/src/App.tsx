@@ -1,280 +1,344 @@
-import React, { useState, useCallback } from 'react';
 import {
-  PrivacyAccount,
-  KeyManager,
   ComplianceModule,
-  ShieldedPoolClient,
+  isStellarAddress,
+  KeyManager,
+  PrivacyAccount,
+  PrivacySDKError,
 } from '@stellar-privacy/sdk';
-
-const POOL_CONFIG = {
-  contractId: process.env.REACT_APP_CONTRACT_ID || 'CCJZK7W4TVG5Q6Z7Y7Q3Z7Y7Q3Z7Y7Q3Z7Y7Q3Z7Y7Q3',
-  networkPassphrase: 'Test SDF Network ; quorum-test',
-  rpcUrl: process.env.REACT_APP_RPC_URL || 'https://rpc.testnet.stellar.org',
-  horizonUrl: process.env.REACT_APP_HORIZON_URL || 'https://horizon-testnet.stellar.org',
-};
+import { useCallback, useMemo, useState } from 'react';
+import { APP_CONFIG } from './config';
 
 type View = 'wallet' | 'deposit' | 'withdraw' | 'compliance' | 'audit';
+
+const VIEWS: Array<{ id: View; label: string }> = [
+  { id: 'wallet', label: 'Wallet' },
+  { id: 'deposit', label: 'Deposit' },
+  { id: 'withdraw', label: 'Withdraw' },
+  { id: 'compliance', label: 'Compliance' },
+  { id: 'audit', label: 'Audit' },
+];
+
+interface Status {
+  kind: 'success' | 'error';
+  message: string;
+}
+
+function formatError(error: unknown): string {
+  if (error instanceof PrivacySDKError) {
+    return `[${error.code}] ${error.message}`;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
 
 function App() {
   const [view, setView] = useState<View>('wallet');
   const [account, setAccount] = useState<PrivacyAccount | null>(null);
-  const [compliance] = useState(
-    () => new ComplianceModule(POOL_CONFIG),
-  );
-  const [status, setStatus] = useState<string>('');
+  const [compliance] = useState(() => new ComplianceModule(APP_CONFIG));
+  const [status, setStatus] = useState<Status | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
+  const [pending, setPending] = useState<string | null>(null);
+  const [regulator, setRegulator] = useState(APP_CONFIG.defaultRegulator);
 
-  const addLog = useCallback((msg: string) => {
-    setLogs(prev => [`[${new Date().toISOString()}] ${msg}`, ...prev].slice(0, 50));
+  const addLog = useCallback((message: string) => {
+    setLogs((prev) => [`[${new Date().toISOString()}] ${message}`, ...prev].slice(0, 50));
   }, []);
 
+  /** Runs an async action with loading + status + audit logging. */
+  const run = useCallback(
+    async (label: string, action: () => Promise<string>) => {
+      setPending(label);
+      setStatus(null);
+      try {
+        const message = await action();
+        setStatus({ kind: 'success', message });
+        addLog(message);
+      } catch (error) {
+        const message = formatError(error);
+        setStatus({ kind: 'error', message });
+        addLog(`FAILED: ${message}`);
+      } finally {
+        setPending(null);
+      }
+    },
+    [addLog],
+  );
+
+  const busy = useMemo(() => pending !== null, [pending]);
+
   const handleCreateAccount = useCallback(() => {
+    if (busy) return;
     try {
-      const kp = KeyManager.generateKeyPair();
-      const acc = new PrivacyAccount(POOL_CONFIG, kp);
-      setAccount(acc);
-      setStatus(`Account created: ${acc.address.slice(0, 16)}...`);
-      addLog(`Created privacy account with key pair`);
-    } catch (err) {
-      setStatus(`Error: ${err}`);
+      const keyPair = KeyManager.generateKeyPair();
+      const next = new PrivacyAccount(APP_CONFIG, keyPair);
+      setAccount(next);
+      setStatus(null);
+      addLog(`Created privacy account ${next.address.slice(0, 12)}…`);
+    } catch (error) {
+      setStatus({ kind: 'error', message: formatError(error) });
+      addLog(`FAILED: ${formatError(error)}`);
     }
-  }, [addLog]);
+  }, [busy, addLog]);
 
-  const handleDeposit = useCallback(async () => {
+  const handleDeposit = useCallback(() => {
     if (!account) return;
-    try {
-      setStatus('Generating deposit proof...');
-      addLog('Generating shielded deposit...');
-      const txHash = await account.deposit({
-        amount: 100n,
+    return run('Deposit', async () => {
+      const tx = await account.deposit({
+        amount: APP_CONFIG.depositAmount,
         recipient: account.address,
-        token: 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2S2QW3EY5XFG2L3UQP',
+        token: APP_CONFIG.usdcToken,
       });
-      setStatus(`Deposit submitted: ${txHash.slice(0, 16)}...`);
-      addLog(`Deposit transaction: ${txHash}`);
-    } catch (err) {
-      setStatus(`Deposit failed: ${err}`);
-    }
-  }, [account, addLog]);
+      return `Deposit prepared — ${APP_CONFIG.depositAmount.toString()} USDC shielded (tx ${tx.slice(0, 16)}…)`;
+    });
+  }, [account, run]);
 
-  const handleWithdraw = useCallback(async () => {
+  const handleWithdraw = useCallback(() => {
     if (!account) return;
-    try {
-      setStatus('Generating withdrawal proof...');
-      addLog('Generating shielded withdrawal...');
-      const txHash = await account.withdraw(
-        { amount: 50n, recipient: account.address, token: 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2S2QW3EY5XFG2L3UQP' },
+    return run('Withdraw', async () => {
+      const tx = await account.withdraw(
+        {
+          amount: APP_CONFIG.withdrawAmount,
+          recipient: account.address,
+          token: APP_CONFIG.usdcToken,
+        },
         0,
       );
-      setStatus(`Withdrawal submitted: ${txHash.slice(0, 16)}...`);
-      addLog(`Withdrawal transaction: ${txHash}`);
-    } catch (err) {
-      setStatus(`Withdrawal failed: ${err}`);
-    }
-  }, [account, addLog]);
+      return `Withdrawal prepared — ${APP_CONFIG.withdrawAmount.toString()} USDC with ZK proof (tx ${tx.slice(0, 16)}…)`;
+    });
+  }, [account, run]);
 
-  const handleRegisterCompliance = useCallback(async () => {
+  const handleRegisterViewingKey = useCallback(() => {
     if (!account) return;
-    try {
+    return run('Register viewing key', async () => {
       await account.registerViewingKey();
-      setStatus('Viewing key registered for compliance');
-      addLog('Registered viewing key for regulatory compliance');
-    } catch (err) {
-      setStatus(`Compliance registration failed: ${err}`);
-    }
-  }, [account, addLog]);
+      return `Viewing key registered for ${account.address.slice(0, 12)}…`;
+    });
+  }, [account, run]);
 
-  const handleAuthorizeViewer = useCallback(async () => {
+  const handleAuthorizeViewer = useCallback(() => {
     if (!account) return;
-    try {
-      const regulatorAddr = 'GREGULATORADDRESS123...';
-      await account.authorizeViewer(regulatorAddr);
-      setStatus(`Authorized ${regulatorAddr.slice(0, 8)}... as viewer`);
-      addLog(`Authorized regulator as viewer`);
-    } catch (err) {
-      setStatus(`Authorization failed: ${err}`);
+    if (!isStellarAddress(regulator)) {
+      const message = 'Regulator address must be a valid Stellar account (G…) address';
+      setStatus({ kind: 'error', message });
+      addLog(`FAILED: ${message}`);
+      return;
     }
-  }, [account, addLog]);
+    return run('Authorize viewer', async () => {
+      await account.authorizeViewer(regulator);
+      return `Authorized ${regulator.slice(0, 8)}… as compliance viewer`;
+    });
+  }, [account, regulator, run, addLog]);
 
-  const handleDiscloseToRegulator = useCallback(async () => {
-    try {
+  const handleDiscloseToRegulator = useCallback(() => {
+    return run('Generate disclosure', async () => {
       const disclosure = await compliance.generateSelectiveDisclosureProof(
         {
-          sender: account?.address || 'unknown',
-          recipient: 'GB...',
-          amount: 100n,
+          sender: account?.address ?? 'unset',
+          recipient: account?.address ?? 'unset',
+          amount: APP_CONFIG.withdrawAmount,
           timestamp: Date.now(),
         },
         new Uint8Array(32),
       );
-      setStatus('Selective disclosure proof generated');
-      addLog(`Generated selective disclosure: ${disclosure.viewingKeyHash.slice(0, 16)}...`);
-    } catch (err) {
-      setStatus(`Disclosure failed: ${err}`);
-    }
-  }, [account, compliance, addLog]);
+      return `Disclosure proof generated (viewing key ${disclosure.viewingKeyHash.slice(0, 12)}…)`;
+    });
+  }, [account, compliance, run]);
 
-  const navButton = (label: string, v: View) => (
-    <button
-      onClick={() => setView(v)}
-      style={{
-        padding: '8px 16px',
-        background: view === v ? '#007bff' : '#f0f0f0',
-        color: view === v ? 'white' : '#333',
-        border: '1px solid #ccc',
-        borderRadius: 4,
-        cursor: 'pointer',
-      }}
-    >
-      {label}
-    </button>
+  const renderNav = () => (
+    <nav className="nav" aria-label="Primary">
+      {VIEWS.map(({ id, label }) => (
+        <button
+          key={id}
+          type="button"
+          className={view === id ? 'active' : undefined}
+          onClick={() => setView(id)}
+          aria-current={view === id ? 'page' : undefined}
+        >
+          {label}
+        </button>
+      ))}
+    </nav>
   );
 
+  const renderStatus = () =>
+    status && (
+      <div className={`banner ${status.kind}`} role="status" aria-live="polite">
+        {status.message.startsWith('[') ? <code>{status.message}</code> : status.message}
+      </div>
+    );
+
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: 20 }}>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Stellar Privacy Layer</h1>
-        <p style={{ color: '#666', margin: '4px 0' }}>
-          Shielded USDC Transfers — Protocol 25 ZK Primitives
-        </p>
+    <div className="app">
+      <header className="app-header">
+        <h1>Stellar Privacy Layer</h1>
+        <p>Shielded USDC transfers — privacy with selective compliance disclosure</p>
       </header>
 
-      <nav style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-        {navButton('Wallet', 'wallet')}
-        {navButton('Deposit', 'deposit')}
-        {navButton('Withdraw', 'withdraw')}
-        {navButton('Compliance', 'compliance')}
-        {navButton('Audit', 'audit')}
-      </nav>
+      {renderNav()}
 
-      <div style={{
-        background: '#f8f9fa',
-        borderRadius: 8,
-        padding: 20,
-        minHeight: 300,
-      }}>
+      <main className="card">
         {view === 'wallet' && (
-          <div>
+          <section aria-label="Wallet">
             <h2>Wallet</h2>
             {!account ? (
-              <div>
-                <p>No account created yet.</p>
-                <button onClick={handleCreateAccount} style={btnStyle}>
+              <>
+                <p className="subtitle">
+                  No privacy account yet. Create one to start shielding USDC — your balances stay
+                  private by design.
+                </p>
+                <button type="button" className="btn" onClick={handleCreateAccount} disabled={busy}>
                   Create Privacy Account
                 </button>
-              </div>
+              </>
             ) : (
-              <div>
-                <p><strong>Address:</strong> {account.address}</p>
-                <p><strong>Viewing Key:</strong> {KeyManager.toHex(account.keyPair.viewingKey).slice(0, 32)}...</p>
-                <button onClick={handleCreateAccount} style={btnStyle}>
-                  New Account
-                </button>
-              </div>
+              <>
+                <p className="detail">
+                  <strong>Address:</strong> <code>{account.address}</code>
+                </p>
+                <p className="detail">
+                  <strong>Viewing Key:</strong>{' '}
+                  <code>{KeyManager.toHex(account.keyPair.viewingKey).slice(0, 32)}…</code>
+                </p>
+                <p className="detail">
+                  <strong>Network:</strong> {APP_CONFIG.networkPassphrase}
+                </p>
+                <div className="btn-row">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={handleCreateAccount}
+                    disabled={busy}
+                  >
+                    New Account
+                  </button>
+                </div>
+              </>
             )}
-          </div>
+          </section>
         )}
 
         {view === 'deposit' && (
-          <div>
+          <section aria-label="Shielded deposit">
             <h2>Shielded Deposit</h2>
-            <p>Deposit USDC into the shielded pool. Your balance is private.</p>
+            <p className="subtitle">
+              Deposit USDC into the shielded pool. A commitment is stored on-chain — the amount
+              stays hidden.
+            </p>
             <button
-              onClick={handleDeposit}
-              style={btnStyle}
-              disabled={!account}
+              type="button"
+              className="btn"
+              onClick={() => void handleDeposit()}
+              disabled={!account || busy}
             >
-              Deposit 100 USDC
+              {pending === 'Deposit' && <span className="spinner" aria-hidden="true" />}
+              Deposit {APP_CONFIG.depositAmount.toString()} USDC
             </button>
-          </div>
+            {!account && <p className="muted">Create a wallet first to deposit.</p>}
+          </section>
         )}
 
         {view === 'withdraw' && (
-          <div>
+          <section aria-label="Shielded withdrawal">
             <h2>Shielded Withdrawal</h2>
-            <p>Withdraw USDC from the shielded pool with a ZK proof.</p>
+            <p className="subtitle">
+              Withdraw USDC with a zero-knowledge proof. The nullifier prevents the same commitment
+              from being spent twice.
+            </p>
             <button
-              onClick={handleWithdraw}
-              style={btnStyle}
-              disabled={!account}
+              type="button"
+              className="btn"
+              onClick={() => void handleWithdraw()}
+              disabled={!account || busy}
             >
-              Withdraw 50 USDC
+              {pending === 'Withdraw' && <span className="spinner" aria-hidden="true" />}
+              Withdraw {APP_CONFIG.withdrawAmount.toString()} USDC
             </button>
-          </div>
+            {!account && <p className="muted">Create a wallet first to withdraw.</p>}
+          </section>
         )}
 
         {view === 'compliance' && (
-          <div>
-            <h2>Compliance & Selective Disclosure</h2>
-            <p>Configure regulatory compliance for your shielded transactions.</p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button onClick={handleRegisterCompliance} style={btnStyle} disabled={!account}>
+          <section aria-label="Compliance and selective disclosure">
+            <h2>Compliance &amp; Selective Disclosure</h2>
+            <p className="subtitle">
+              Prove regulatory compliance without surrendering privacy: register a viewing key,
+              authorize a regulator, and disclose only what is required.
+            </p>
+            <div className="btn-row">
+              <button
+                type="button"
+                className="btn"
+                onClick={() => void handleRegisterViewingKey()}
+                disabled={!account || busy}
+              >
+                {pending === 'Register viewing key' && (
+                  <span className="spinner" aria-hidden="true" />
+                )}
                 Register Viewing Key
               </button>
-              <button onClick={handleAuthorizeViewer} style={btnStyle} disabled={!account}>
-                Authorize Regulator
-              </button>
-              <button onClick={handleDiscloseToRegulator} style={btnStyle}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => void handleDiscloseToRegulator()}
+                disabled={busy}
+              >
+                {pending === 'Generate disclosure' && (
+                  <span className="spinner" aria-hidden="true" />
+                )}
                 Generate Disclosure Proof
               </button>
             </div>
-          </div>
+
+            <label className="field-label" htmlFor="regulator-address">
+              Regulator address
+            </label>
+            <input
+              id="regulator-address"
+              className="input"
+              value={regulator}
+              onChange={(event) => setRegulator(event.target.value.trim())}
+              placeholder="G…"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <div className="btn-row" style={{ marginTop: 12 }}>
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => void handleAuthorizeViewer()}
+                disabled={!account || busy}
+              >
+                {pending === 'Authorize viewer' && <span className="spinner" aria-hidden="true" />}
+                Authorize Regulator
+              </button>
+            </div>
+            {!account && <p className="muted">Create a wallet first to register compliance.</p>}
+          </section>
         )}
 
         {view === 'audit' && (
-          <div>
+          <section aria-label="Audit log">
             <h2>Audit Log</h2>
-            <p>Transaction history and compliance audit trail.</p>
+            <p className="subtitle">Transaction history and compliance audit trail.</p>
             {logs.length === 0 ? (
-              <p style={{ color: '#999' }}>No activity yet.</p>
+              <p className="muted">No activity yet.</p>
             ) : (
-              <div style={{
-                background: '#1a1a2e',
-                color: '#0f0',
-                padding: 12,
-                borderRadius: 4,
-                fontFamily: 'monospace',
-                fontSize: 12,
-                maxHeight: 400,
-                overflow: 'auto',
-              }}>
-                {logs.map((log, i) => (
-                  <div key={i}>{log}</div>
+              <div className="audit-log" role="log" aria-live="polite">
+                {logs.map((line, index) => (
+                  <div key={line + String(index)}>{line}</div>
                 ))}
               </div>
             )}
-          </div>
+          </section>
         )}
-      </div>
 
-      {status && (
-        <div style={{
-          marginTop: 16,
-          padding: '8px 16px',
-          background: '#d4edda',
-          borderRadius: 4,
-          color: '#155724',
-        }}>
-          {status}
-        </div>
-      )}
+        {renderStatus()}
+      </main>
 
-      <footer style={{ marginTop: 32, color: '#999', fontSize: 12 }}>
-        Powered by Stellar Protocol 25 — BN254 + Poseidon ZK Primitives
+      <footer className="app-footer">
+        Powered by Stellar Protocol 25 — BN254 + Poseidon ZK primitives · testnet by default
       </footer>
     </div>
   );
 }
-
-const btnStyle: React.CSSProperties = {
-  padding: '10px 20px',
-  background: '#007bff',
-  color: 'white',
-  border: 'none',
-  borderRadius: 4,
-  cursor: 'pointer',
-  fontSize: 14,
-  fontWeight: 500,
-};
 
 export default App;
