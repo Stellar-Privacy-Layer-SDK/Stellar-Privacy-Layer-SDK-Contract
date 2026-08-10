@@ -1,8 +1,21 @@
 export interface PoolConfig {
+  /** The deployed `ShieldedPool` contract address (C...). */
   contractId: string;
+  /** Stellar network passphrase, e.g. `Test SDF Network ; quorum-test`. */
   networkPassphrase: string;
+  /** Soroban RPC endpoint URL. */
   rpcUrl: string;
-  horizonUrl: string;
+  /** Horizon endpoint URL (used for account/balance queries). */
+  horizonUrl?: string;
+  /**
+   * Optional public key of the transaction source account. Required for
+   * signing/submitting write transactions; optional for read-only calls.
+   */
+  sourceAccount?: string;
+  /** Base fee for transactions, in stroops (default: '10000'). */
+  fee?: string;
+  /** Allow plain-HTTP RPC endpoints (dev only; defaults to false). */
+  allowHttp?: boolean;
 }
 
 export interface ShieldedTransferProof {
@@ -32,12 +45,21 @@ export interface WithdrawalEvent {
 }
 
 export interface ProofInputs {
+  /** Hex-encoded 32-byte secret. */
   secret: string;
+  /** Recipient address (G...). */
   recipient: string;
+  /** Amount as a decimal string. */
   amount: string;
   merklePath: string[];
   merkleIndices: boolean[];
   root: string;
+  /**
+   * Informational in the reference implementation: `generateWithdrawalProof`
+   * derives the canonical proof binding (`H(H(secret) || commitment)`) and
+   * ignores this field. See {@link KeyManager.hashNullifier} for the on-chain
+   * nullifier concept.
+   */
   nullifier: string;
   commitment: string;
   leafIndex: number;

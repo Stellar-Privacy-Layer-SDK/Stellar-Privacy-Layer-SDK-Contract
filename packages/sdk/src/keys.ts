@@ -1,27 +1,39 @@
-import crypto from 'crypto';
-import type { KeyPair } from './types';
-import { ErrorCode, PrivacySDKError } from './errors';
+/**
+ * Key management for the Stellar Privacy Layer SDK.
+ *
+ * - Deterministic HKDF-SHA256 key derivation with domain separation.
+ * - AES-256-GCM encryption for regulatory viewing keys (authenticated).
+ * - Commitment / nullifier hashing (SHA-256) matching the off-chain prover.
+ *
+ * All primitives come from {@link crypto.ts} and run in browsers and Node.js.
+ */
+import {
+  aesGcmDecrypt,
+  aesGcmEncrypt,
+  bytesToHex,
+  hexToBytes,
+  hkdfSha256,
+  randomBytes,
+  sha256Digest,
+} from './crypto.js';
+import { ErrorCode, PrivacySDKError } from './errors.js';
+import type { KeyPair } from './types.js';
 
-const AES_TAG_LENGTH = 16;
-const IV_LENGTH = 12;
-const HKDF_INFO = Buffer.from('Stellar-Privacy-Layer-v1', 'utf-8');
-const HKDF_SALT = Buffer.from('Stellar-Privacy-SDK-v1', 'utf-8');
+const HKDF_INFO = new TextEncoder().encode('Stellar-Privacy-Layer-v1');
+const HKDF_SALT = new TextEncoder().encode('Stellar-Privacy-SDK-v1');
 
-function deriveKey(material: Uint8Array): Buffer {
-  const ikm = Buffer.from(material);
-  const key = crypto.hkdfSync('sha256', ikm, HKDF_SALT, HKDF_INFO, 32);
-  return Buffer.from(key);
+function deriveKey(material: Uint8Array): Uint8Array {
+  return hkdfSha256(material, HKDF_SALT, HKDF_INFO, 32);
 }
 
 export class KeyManager {
+  /** Generate a fresh privacy key pair (secret key, public key, viewing key). */
   static generateKeyPair(): KeyPair {
     try {
-      const secretKey = crypto.randomBytes(32);
+      const secretKey = randomBytes(32);
       const key = deriveKey(secretKey);
-      const publicKey = key.toString('hex');
-
-      const viewingKey = crypto.randomBytes(32);
-
+      const publicKey = bytesToHex(key);
+      const viewingKey = randomBytes(32);
       return { secretKey, publicKey, viewingKey };
     } catch (error) {
       throw new PrivacySDKError(
@@ -32,55 +44,43 @@ export class KeyManager {
     }
   }
 
+  /** Generate a fresh 32-byte deposit secret. */
   static generateSecret(): Uint8Array {
-    return crypto.randomBytes(32);
+    return randomBytes(32);
   }
 
+  /** Generate a fresh 32-byte regulatory viewing key. */
   static generateViewingKey(): Uint8Array {
-    return crypto.randomBytes(32);
+    return randomBytes(32);
   }
 
+  /** SHA-256 hash of a viewing key, hex-encoded. */
   static computeViewingKeyHash(viewingKey: Uint8Array): string {
-    const hash = crypto.createHash('sha256').update(viewingKey).digest();
-    return hash.toString('hex');
+    return bytesToHex(sha256Digest(viewingKey));
   }
 
+  /** Derive the public key (hex) from a secret key material. */
   static derivePublicKey(secretKey: Uint8Array): string {
-    const key = deriveKey(secretKey);
-    return key.toString('hex');
+    return bytesToHex(deriveKey(secretKey));
   }
 
-  static encryptForViewer(
-    data: Uint8Array,
-    viewerPublicKey: Uint8Array,
-  ): Uint8Array {
-    const iv = crypto.randomBytes(IV_LENGTH);
+  /**
+   * Encrypt data for a viewer using their public key material with
+   * AES-256-GCM. Output layout: [iv || ciphertext || tag].
+   */
+  static encryptForViewer(data: Uint8Array, viewerPublicKey: Uint8Array): Uint8Array {
     const key = deriveKey(viewerPublicKey);
-    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-    const encrypted = Buffer.concat([
-      cipher.update(Buffer.from(data)),
-      cipher.final(),
-    ]);
-    const tag = cipher.getAuthTag();
-    return Buffer.concat([iv, encrypted, tag]);
+    return aesGcmEncrypt(key, data);
   }
 
-  static decryptWithViewingKey(
-    encryptedData: Uint8Array,
-    viewingKey: Uint8Array,
-  ): Uint8Array {
+  /**
+   * Decrypt data encrypted with {@link encryptForViewer} using the matching
+   * viewing key. Throws {@link PrivacySDKError} on tampered data or a wrong key.
+   */
+  static decryptWithViewingKey(encryptedData: Uint8Array, viewingKey: Uint8Array): Uint8Array {
     try {
-      const iv = encryptedData.slice(0, IV_LENGTH);
-      const tag = encryptedData.slice(encryptedData.length - AES_TAG_LENGTH);
-      const data = encryptedData.slice(IV_LENGTH, encryptedData.length - AES_TAG_LENGTH);
       const key = deriveKey(viewingKey);
-      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-      decipher.setAuthTag(Buffer.from(tag));
-      const decrypted = Buffer.concat([
-        decipher.update(Buffer.from(data)),
-        decipher.final(),
-      ]);
-      return decrypted;
+      return aesGcmDecrypt(key, encryptedData);
     } catch (error) {
       throw new PrivacySDKError(
         ErrorCode.COMPLIANCE_ERROR,
@@ -90,26 +90,43 @@ export class KeyManager {
     }
   }
 
+  /**
+   * Compute the shielded deposit commitment: SHA-256(secret || recipient || amount).
+   * Note: this is the convenience hash used by the reference SDK. The on-chain
+   * contract and Rust prover use Poseidon-based commitments for production use.
+   */
   static hashCommitment(secret: Uint8Array, recipient: string, amount: bigint): string {
-    const hash = crypto.createHash('sha256');
-    hash.update(Buffer.from(secret));
-    hash.update(Buffer.from(recipient));
-    hash.update(amount.toString());
-    return hash.digest().toString('hex');
+    const recipientBytes = new TextEncoder().encode(recipient);
+    const amountBytes = new TextEncoder().encode(amount.toString());
+    const buf = new Uint8Array(secret.length + recipientBytes.length + amountBytes.length);
+    buf.set(secret, 0);
+    buf.set(recipientBytes, secret.length);
+    buf.set(amountBytes, secret.length + recipientBytes.length);
+    return bytesToHex(sha256Digest(buf));
   }
 
+  /**
+   * Compute the on-chain nullifier: SHA-256(secret || commitment).
+   *
+   * This matches the nullifier concept used by the Rust prover and the
+   * contract (Poseidon(secret, commitment) in production). Note that the
+   * reference JS proof in {@link ProverClient} binds a *derived* nullifier
+   * `H(H(secret) || commitment)` so it can be verified without exposing the
+   * secret — see `generateWithdrawalProof`.
+   */
   static hashNullifier(secret: Uint8Array, commitment: string): string {
-    const hash = crypto.createHash('sha256');
-    hash.update(Buffer.from(secret));
-    hash.update(Buffer.from(commitment, 'hex'));
-    return hash.digest().toString('hex');
+    const commitmentBytes = hexToBytes(commitment);
+    const buf = new Uint8Array(secret.length + commitmentBytes.length);
+    buf.set(secret, 0);
+    buf.set(commitmentBytes, secret.length);
+    return bytesToHex(sha256Digest(buf));
   }
 
   static toHex(bytes: Uint8Array): string {
-    return Buffer.from(bytes).toString('hex');
+    return bytesToHex(bytes);
   }
 
   static fromHex(hex: string): Uint8Array {
-    return Buffer.from(hex, 'hex');
+    return hexToBytes(hex);
   }
 }

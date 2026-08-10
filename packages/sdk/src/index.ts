@@ -1,16 +1,37 @@
-export { ShieldedPoolClient } from './client';
-export { ProverClient } from './prover';
-export { PrivacyAccount } from './account';
-export { KeyManager } from './keys';
-export { ComplianceModule } from './compliance';
+export { PrivacyAccount } from './account.js';
+export { ShieldedPoolClient } from './client.js';
+export { ComplianceModule } from './compliance.js';
+export {
+  aesGcmDecrypt,
+  aesGcmEncrypt,
+  bytesToHex,
+  equalBytes,
+  hexToBytes,
+  hkdfSha256,
+  randomBytes,
+  randomUUID,
+  sha256Digest,
+  sha256Hex,
+} from './crypto.js';
+export { ErrorCode, PrivacySDKError } from './errors.js';
+export { KeyManager } from './keys.js';
+export type { LogEntry, LogLevel, LogSink } from './logger.js';
+export { configureLogger, createLogger } from './logger.js';
+export { ProverClient } from './prover.js';
 export type {
-  ShieldedTransferProof,
-  DepositEvent,
-  WithdrawalEvent,
-  ProofInputs,
-  PoolConfig,
   ComplianceView,
+  DepositEvent,
+  KeyPair,
+  PoolConfig,
   PoolStats,
+  ProofInputs,
   ShieldedTransferParams,
-} from './types';
-export { ErrorCode, PrivacySDKError } from './errors';
+  ShieldedTransferProof,
+  WithdrawalEvent,
+} from './types.js';
+export {
+  isHex,
+  isPositiveAmount,
+  isStellarAddress,
+  validatePoolConfig,
+} from './validation.js';
