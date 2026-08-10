@@ -1,27 +1,41 @@
 {
   "name": "@stellar-privacy/selective-disclosure",
   "version": "0.1.0",
-  "license": "MIT",
-  "private": false,
+  "description": "Regulatory viewing keys and selective disclosure proofs for the Stellar Privacy Layer.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist/"
   ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "lint": "biome check src/",
+    "typecheck": "tsc --noEmit",
+    "format": "biome format --write src/",
+    "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
     "@stellar-privacy/sdk": "^0.1.0"
   },
   "devDependencies": {
-    "typescript": "^5.6.0",
-    "vitest": "^2.1.0",
-    "@types/node": "^22.0.0"
+    "@biomejs/biome": "^2.5.7",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^4.1.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.19.0"
   }
 }
