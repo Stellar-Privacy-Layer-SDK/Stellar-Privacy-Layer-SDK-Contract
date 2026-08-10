@@ -2,6 +2,16 @@ use soroban_sdk::{Address, Bytes, Env, Vec};
 
 use crate::types::*;
 
+/// Verifies a shielded-transfer proof against the on-chain public inputs.
+///
+/// NOTE: this is the **reference** verification — it rejects degenerate
+/// (all-zero) proofs and confirms structural well-formedness, paired with a
+/// Merkle-root membership check. The production path is
+/// [`crate::g16::verify_groth16`], which runs the full Groth16 verification
+/// equation on-chain with Stellar's native BLS12-381 host functions
+/// (`env.crypto().bls12_381()`: `g1_msm` + `pairing_check`). It is wired
+/// through `ShieldedPool::withdraw_groth16` and proven end-to-end with real
+/// arkworks-generated proofs (see `test_snapshots/groth16/fixture.json`).
 pub fn verify_shielded_transfer(_e: &Env, proof: &Proof, _public_amount: i128) -> bool {
     if proof.proof_a.len() < 2 || proof.proof_b.len() < 4 || proof.proof_c.len() < 2 {
         return false;
