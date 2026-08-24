@@ -28,7 +28,7 @@
   "dependencies": {
     "@noble/ciphers": "^2.3.0",
     "@noble/hashes": "^2.3.0",
-    "@stellar/stellar-sdk": "^16.2.0"
+    "@stellar/stellar-sdk": "^17.0.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.7",
