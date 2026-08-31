@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@noble/ciphers": "^2.3.0",
-    "@noble/hashes": "^2.3.0",
+    "@noble/hashes": "^2.4.0",
     "@stellar/stellar-sdk": "^16.2.0"
   },
   "devDependencies": {
